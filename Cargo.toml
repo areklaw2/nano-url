@@ -8,9 +8,12 @@ edition = "2024"
 
 [dependencies]
 dioxus = { version = "0.7.1", features = ["router", "fullstack"] }
+dioxus-icons = { version = "0.1.0", default-features = false }
+dioxus-primitives = { git = "https://github.com/DioxusLabs/components", version = "0.0.1", default-features = false, features = ["router"] }
+time = { version = "0.3.51", default-features = false, features = ["wasm-bindgen"]}
 
 [features]
-default = ["web"]
+default = ["web", "server"]
 # The feature that are only required for the web = ["dioxus/web"] build target should be optional and only enabled in the web = ["dioxus/web"] feature
 web = ["dioxus/web"]
 # The feature that are only required for the desktop = ["dioxus/desktop"] build target should be optional and only enabled in the desktop = ["dioxus/desktop"] feature
@@ -19,3 +22,6 @@ desktop = ["dioxus/desktop"]
 mobile = ["dioxus/mobile"]
 # The feature that are only required for the server = ["dioxus/server"] build target should be optional and only enabled in the server = ["dioxus/server"] feature
 server = ["dioxus/server"]
+
+[dev-dependencies]
+dioxus-ssr = "0.7.9"

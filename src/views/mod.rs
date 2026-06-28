@@ -1,7 +1,7 @@
-mod blog;
 mod home;
+mod links;
 mod navbar;
 
-pub use blog::Blog;
 pub use home::Home;
+pub use links::Links;
 pub use navbar::Navbar;
