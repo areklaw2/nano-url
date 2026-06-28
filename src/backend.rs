@@ -2,9 +2,9 @@ use anyhow::Result;
 use dioxus::prelude::*;
 
 #[cfg(feature = "server")]
-use sqlx::SqlitePool;
+use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
 #[cfg(feature = "server")]
-use std::sync::OnceLock;
+use std::{str::FromStr, sync::OnceLock};
 
 #[cfg(feature = "server")]
 static DB: OnceLock<SqlitePool> = OnceLock::new();
@@ -14,9 +14,13 @@ pub async fn get_db() -> &'static SqlitePool {
     if let Some(pool) = DB.get() {
         return pool;
     }
-    let pool = SqlitePool::connect("sqlite://nano_url.db")
-        .await
-        .expect("Failed to open database");
+    let pool = SqlitePool::connect_with(
+        SqliteConnectOptions::from_str("sqlite://nano_url.db")
+            .expect("Invalid database URL")
+            .create_if_missing(true),
+    )
+    .await
+    .expect("Failed to open database");
 
     sqlx::migrate!("./migrations")
         .run(&pool)
@@ -27,10 +31,10 @@ pub async fn get_db() -> &'static SqlitePool {
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-struct CreateUrl {
-    url: String,
-    alias: Option<String>,
-    expiration: Option<String>,
+pub struct CreateUrlRequest {
+    pub url: String,
+    pub alias: Option<String>,
+    pub expiration: Option<String>,
 }
 
 fn validate_url(url: &str) -> Result<(), ServerFnError> {
@@ -59,7 +63,7 @@ fn validate_alias(alias: &str) -> Result<(), ServerFnError> {
 }
 
 #[post("/api/url")]
-pub async fn create_url(request: CreateUrl) -> Result<(), ServerFnError> {
+pub async fn create_url(request: CreateUrlRequest) -> Result<(), ServerFnError> {
     validate_url(&request.url)?;
     if let Some(alias) = &request.alias {
         validate_alias(alias)?;
@@ -72,6 +76,11 @@ pub async fn create_url(request: CreateUrl) -> Result<(), ServerFnError> {
         .bind(request.expiration)
         .execute(db)
         .await
-        .map_err(ServerFnError::new)?;
+        .map_err(|e| match e {
+            sqlx::Error::Database(db_err) if db_err.is_unique_violation() => {
+                ServerFnError::new("That nano url is already taken, try another one")
+            }
+            _ => ServerFnError::new("Something went wrong creating your link, please try again"),
+        })?;
     Ok(())
 }

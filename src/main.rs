@@ -1,5 +1,6 @@
 use dioxus::prelude::*;
 
+use components::ToastProvider;
 use views::{Home, Links, Navbar};
 
 mod backend;
@@ -36,6 +37,6 @@ fn App() -> Element {
         document::Link { rel: "icon", href: FAVICON }
         document::Stylesheet { href: MAIN_CSS }
         document::Stylesheet { href: DX_COMPONENT_CSS }
-        Router::<Route> {}
+        ToastProvider { Router::<Route> {} }
     }
 }
