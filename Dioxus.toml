@@ -3,7 +3,7 @@
 [web.app]
 
 # HTML title tag content
-title = "nano_url"
+title = "Nano Url"
 
 # include `assets` in web platform
 [web.resource]

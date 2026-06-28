@@ -2,6 +2,7 @@ use dioxus::prelude::*;
 
 use views::{Home, Links, Navbar};
 
+mod backend;
 mod components;
 mod views;
 
@@ -11,7 +12,7 @@ enum Route {
     #[route("/")]
     Home {},
     #[route("/links")]
-    Links { id: i32 },
+    Links {},
 }
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
@@ -19,7 +20,14 @@ const MAIN_CSS: Asset = asset!("/assets/styling/main.css");
 const DX_COMPONENT_CSS: Asset = asset!("/assets/dx-components-theme.css");
 
 fn main() {
+    #[cfg(not(feature = "server"))]
     dioxus::launch(App);
+
+    #[cfg(feature = "server")]
+    dioxus::serve(|| async move {
+        let router = dioxus::server::router(App);
+        Ok(router)
+    });
 }
 
 #[component]
