@@ -1,34 +1,25 @@
 use anyhow::Result;
+use dioxus::fullstack::{AsStatusCode, StatusCode};
 use dioxus::prelude::*;
 
 #[cfg(feature = "server")]
+use dioxus::fullstack::Lazy;
+#[cfg(feature = "server")]
 use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
 #[cfg(feature = "server")]
-use std::{str::FromStr, sync::OnceLock};
+use std::str::FromStr;
 
 #[cfg(feature = "server")]
-static DB: OnceLock<SqlitePool> = OnceLock::new();
-
-#[cfg(feature = "server")]
-pub async fn get_db() -> &'static SqlitePool {
-    if let Some(pool) = DB.get() {
-        return pool;
-    }
+static DB: Lazy<SqlitePool> = Lazy::new(|| async {
     let pool = SqlitePool::connect_with(
-        SqliteConnectOptions::from_str("sqlite://nano_url.db")
-            .expect("Invalid database URL")
-            .create_if_missing(true),
+        SqliteConnectOptions::from_str("sqlite://nano_url.db")?.create_if_missing(true),
     )
-    .await
-    .expect("Failed to open database");
+    .await?;
 
-    sqlx::migrate!("./migrations")
-        .run(&pool)
-        .await
-        .expect("Failed to run migrations");
+    sqlx::migrate!("./migrations").run(&pool).await?;
 
-    DB.get_or_init(|| pool)
-}
+    dioxus::Ok(pool)
+});
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct CreateUrlRequest {
@@ -37,50 +28,94 @@ pub struct CreateUrlRequest {
     pub expiration: Option<String>,
 }
 
-fn validate_url(url: &str) -> Result<(), ServerFnError> {
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum CreateUrlError {
+    BadRequest(String),
+    AliasTaken,
+    Internal,
+}
+
+impl std::fmt::Display for CreateUrlError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CreateUrlError::BadRequest(msg) => write!(f, "{msg}"),
+            CreateUrlError::AliasTaken => {
+                write!(f, "That nano url is already taken, try another one")
+            }
+            CreateUrlError::Internal => {
+                write!(
+                    f,
+                    "Something went wrong creating your link, please try again"
+                )
+            }
+        }
+    }
+}
+
+impl AsStatusCode for CreateUrlError {
+    fn as_status_code(&self) -> StatusCode {
+        match self {
+            CreateUrlError::BadRequest(_) => StatusCode::BAD_REQUEST,
+            CreateUrlError::AliasTaken => StatusCode::CONFLICT,
+            CreateUrlError::Internal => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
+impl From<ServerFnError> for CreateUrlError {
+    fn from(_: ServerFnError) -> Self {
+        CreateUrlError::Internal
+    }
+}
+
+fn validate_url(url: &str) -> Result<(), CreateUrlError> {
     if url.trim().is_empty() {
-        return Err(ServerFnError::new("url is empty or whitespace"));
+        return Err(CreateUrlError::BadRequest(
+            "url is empty or whitespace".into(),
+        ));
     }
     if url.contains(char::is_whitespace) {
-        return Err(ServerFnError::new("url must not contain whitespace"));
+        return Err(CreateUrlError::BadRequest(
+            "url must not contain whitespace".into(),
+        ));
     }
     Ok(())
 }
 
-fn validate_alias(alias: &str) -> Result<(), ServerFnError> {
+fn validate_alias(alias: &str) -> Result<(), CreateUrlError> {
     if alias.len() < 5 {
-        return Err(ServerFnError::new("alias must be at least 5 characters"));
+        return Err(CreateUrlError::BadRequest(
+            "alias must be at least 5 characters".into(),
+        ));
     }
     if !alias
         .chars()
         .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
     {
-        return Err(ServerFnError::new(
-            "alias can only contain letters, numbers, - and _",
+        return Err(CreateUrlError::BadRequest(
+            "alias can only contain letters, numbers, - and _".into(),
         ));
     }
     Ok(())
 }
 
 #[post("/api/url")]
-pub async fn create_url(request: CreateUrlRequest) -> Result<(), ServerFnError> {
+pub async fn create_url(request: CreateUrlRequest) -> Result<(), CreateUrlError> {
     validate_url(&request.url)?;
     if let Some(alias) = &request.alias {
         validate_alias(alias)?;
     }
 
-    let db = get_db().await;
-    sqlx::query("INSERT INTO urls (hash, url, expiration) VALUES (?, ?, ?)")
+    let insert = sqlx::query("INSERT INTO urls (hash, url, expiration) VALUES (?, ?, ?)")
         .bind("test")
         .bind(request.url)
         .bind(request.expiration)
-        .execute(db)
-        .await
-        .map_err(|e| match e {
-            sqlx::Error::Database(db_err) if db_err.is_unique_violation() => {
-                ServerFnError::new("That nano url is already taken, try another one")
-            }
-            _ => ServerFnError::new("Something went wrong creating your link, please try again"),
-        })?;
-    Ok(())
+        .execute(&*DB)
+        .await;
+
+    match insert {
+        Ok(_) => Ok(()),
+        Err(sqlx::Error::Database(e)) if e.is_unique_violation() => Err(CreateUrlError::AliasTaken),
+        Err(_) => Err(CreateUrlError::Internal),
+    }
 }

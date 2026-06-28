@@ -44,13 +44,7 @@ pub fn Home() -> Element {
             .await
             {
                 Ok(_) => toast.success("Link created!".into(), ToastOptions::default()),
-                Err(e) => {
-                    let msg = match e {
-                        ServerFnError::ServerError { message, .. } => message,
-                        other => other.to_string(),
-                    };
-                    toast.error(msg, ToastOptions::default());
-                }
+                Err(e) => toast.error(e.to_string(), ToastOptions::default()),
             }
         });
     };
