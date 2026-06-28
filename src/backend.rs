@@ -8,6 +8,7 @@ use dioxus::fullstack::Lazy;
 use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
 #[cfg(feature = "server")]
 use std::str::FromStr;
+use thiserror::Error;
 
 #[cfg(feature = "server")]
 static DB: Lazy<SqlitePool> = Lazy::new(|| async {
@@ -28,28 +29,14 @@ pub struct CreateUrlRequest {
     pub expiration: Option<String>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Error)]
 pub enum CreateUrlError {
+    #[error("{0}")]
     BadRequest(String),
+    #[error("That nano url is already taken, try another one")]
     AliasTaken,
+    #[error("Something went wrong creating your link, please try again")]
     Internal,
-}
-
-impl std::fmt::Display for CreateUrlError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CreateUrlError::BadRequest(msg) => write!(f, "{msg}"),
-            CreateUrlError::AliasTaken => {
-                write!(f, "That nano url is already taken, try another one")
-            }
-            CreateUrlError::Internal => {
-                write!(
-                    f,
-                    "Something went wrong creating your link, please try again"
-                )
-            }
-        }
-    }
 }
 
 impl AsStatusCode for CreateUrlError {
