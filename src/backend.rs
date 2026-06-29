@@ -94,26 +94,72 @@ fn validate_alias(alias: &str) -> Result<(), CreateUrlError> {
     Ok(())
 }
 
+const BASE62: &[u8; 62] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+const URL_LENGTH: usize = 6;
+const MAX_RETRIES: usize = 5;
+
+#[cfg(feature = "server")]
+fn encode(id: usize) -> String {
+    let mut remaining = id;
+    let mut digits = Vec::new();
+    while remaining > 0 {
+        let carry = remaining % BASE62.len();
+        digits.push(carry);
+        remaining /= BASE62.len();
+    }
+
+    while digits.len() < URL_LENGTH {
+        digits.push(0);
+    }
+    digits.reverse();
+    digits.iter().map(|&d| BASE62[d] as char).collect()
+}
+
 #[post("/api/url")]
 pub async fn create_url(request: CreateUrlRequest) -> Result<String, CreateUrlError> {
     validate_url(&request.url)?;
     if let Some(alias) = &request.alias {
         validate_alias(alias)?;
+
+        let inserted = sqlx::query_scalar::<_, String>(
+            "INSERT INTO urls (hash, url, expiration) VALUES (?, ?, ?) RETURNING hash",
+        )
+        .bind(alias)
+        .bind(request.url.as_str())
+        .bind(request.expiration.as_deref())
+        .fetch_one(&*DB)
+        .await;
+
+        match inserted {
+            Ok(hash) => return Ok(format!("{}/{}", base_url().trim_end_matches('/'), hash)),
+            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+                return Err(CreateUrlError::AliasTaken);
+            }
+            Err(_) => return Err(CreateUrlError::Internal),
+        }
     }
 
-    let hash = "test2";
-    let inserted = sqlx::query_scalar::<_, String>(
-        "INSERT INTO urls (hash, url, expiration) VALUES (?, ?, ?) RETURNING hash",
-    )
-    .bind(hash)
-    .bind(request.url)
-    .bind(request.expiration)
-    .fetch_one(&*DB)
-    .await;
+    for _ in 0..MAX_RETRIES {
+        let id = fastrand::usize(0..BASE62.len().pow(URL_LENGTH as u32));
+        let hash: String = encode(id);
 
-    match inserted {
-        Ok(hash) => Ok(format!("{}/{}", base_url().trim_end_matches('/'), hash)),
-        Err(sqlx::Error::Database(e)) if e.is_unique_violation() => Err(CreateUrlError::AliasTaken),
-        Err(_) => Err(CreateUrlError::Internal),
+        let inserted = sqlx::query_scalar::<_, String>(
+            "INSERT INTO urls (hash, url, expiration) VALUES (?, ?, ?) RETURNING hash",
+        )
+        .bind(hash)
+        .bind(request.url.as_str())
+        .bind(request.expiration.as_deref())
+        .fetch_one(&*DB)
+        .await;
+
+        match inserted {
+            Ok(hash) => return Ok(format!("{}/{}", base_url().trim_end_matches('/'), hash)),
+            Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
+                continue;
+            }
+            Err(_) => return Err(CreateUrlError::Internal),
+        }
     }
+
+    return Err(CreateUrlError::Internal);
 }

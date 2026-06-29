@@ -15,6 +15,7 @@ serde = { version = "1.0.228", features = ["derive"] }
 anyhow = "1.0.103"
 thiserror = "2.0.18"
 sqlx = { version = "0.9.0", features = ["sqlite", "runtime-tokio", "macros", "migrate"], optional = true }
+fastrand = { version = "2.4", optional = true }
 
 [features]
 default = ["web", "server"]
@@ -25,7 +26,7 @@ desktop = ["dioxus/desktop"]
 # The feature that are only required for the mobile = ["dioxus/mobile"] build target should be optional and only enabled in the mobile = ["dioxus/mobile"] feature
 mobile = ["dioxus/mobile"]
 # The feature that are only required for the server = ["dioxus/server"] build target should be optional and only enabled in the server = ["dioxus/server"] feature
-server = ["dioxus/server", "dep:sqlx"]
+server = ["dioxus/server", "dep:sqlx", "dep:fastrand"]
 
 [dev-dependencies]
 dioxus-ssr = "0.7.9"

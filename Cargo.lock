@@ -3752,6 +3752,7 @@ dependencies = [
  "dioxus-icons",
  "dioxus-primitives",
  "dioxus-ssr",
+ "fastrand",
  "serde",
  "sqlx",
  "thiserror 2.0.18",
