@@ -10,6 +10,7 @@ const HOME_CSS: Asset = asset!("/assets/styling/home.css");
 
 #[component]
 pub fn Home() -> Element {
+    let mut nano_url = use_signal(|| None::<String>);
     let mut long_url = use_signal(String::new);
     let mut alias = use_signal(|| None::<String>);
     let mut expiration = use_signal(|| None::<Date>);
@@ -43,7 +44,10 @@ pub fn Home() -> Element {
             })
             .await
             {
-                Ok(_) => toast.success("Link created!".into(), ToastOptions::default()),
+                Ok(link) => {
+                    nano_url.set(Some(link));
+                    toast.success("Link created!".into(), ToastOptions::default());
+                }
                 Err(e) => toast.error(e.to_string(), ToastOptions::default()),
             }
         });
@@ -98,6 +102,16 @@ pub fn Home() -> Element {
                 }
                 CardFooter { id: "nano-footer",
                     Button { form: "url-form", id: "nano-submit", "Make Nano" }
+                }
+            }
+            if let Some(nano_url) = nano_url.read().as_deref() {
+                Card { id: "link-card",
+                    CardHeader {
+                        CardTitle { "Your Nano Link" }
+                    }
+                    CardContent {
+                        a { class: "link", href: "{nano_url}", "{nano_url}" }
+                    }
                 }
             }
             Card { id: "stats-card",

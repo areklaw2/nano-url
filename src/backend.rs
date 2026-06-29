@@ -22,6 +22,14 @@ static DB: Lazy<SqlitePool> = Lazy::new(|| async {
     dioxus::Ok(pool)
 });
 
+#[cfg(feature = "server")]
+fn base_url() -> &'static str {
+    static BASE_URL: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    BASE_URL.get_or_init(|| {
+        std::env::var("BASE_URL").unwrap_or_else(|_| "http://localhost:8080".into())
+    })
+}
+
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct CreateUrlRequest {
     pub url: String,
@@ -87,21 +95,24 @@ fn validate_alias(alias: &str) -> Result<(), CreateUrlError> {
 }
 
 #[post("/api/url")]
-pub async fn create_url(request: CreateUrlRequest) -> Result<(), CreateUrlError> {
+pub async fn create_url(request: CreateUrlRequest) -> Result<String, CreateUrlError> {
     validate_url(&request.url)?;
     if let Some(alias) = &request.alias {
         validate_alias(alias)?;
     }
 
-    let insert = sqlx::query("INSERT INTO urls (hash, url, expiration) VALUES (?, ?, ?)")
-        .bind("test")
-        .bind(request.url)
-        .bind(request.expiration)
-        .execute(&*DB)
-        .await;
+    let hash = "test2";
+    let inserted = sqlx::query_scalar::<_, String>(
+        "INSERT INTO urls (hash, url, expiration) VALUES (?, ?, ?) RETURNING hash",
+    )
+    .bind(hash)
+    .bind(request.url)
+    .bind(request.expiration)
+    .fetch_one(&*DB)
+    .await;
 
-    match insert {
-        Ok(_) => Ok(()),
+    match inserted {
+        Ok(hash) => Ok(format!("{}/{}", base_url().trim_end_matches('/'), hash)),
         Err(sqlx::Error::Database(e)) if e.is_unique_violation() => Err(CreateUrlError::AliasTaken),
         Err(_) => Err(CreateUrlError::Internal),
     }
