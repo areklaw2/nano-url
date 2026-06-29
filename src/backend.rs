@@ -5,6 +5,8 @@ use dioxus::prelude::*;
 #[cfg(feature = "server")]
 use dioxus::fullstack::Lazy;
 #[cfg(feature = "server")]
+use dioxus::server::axum;
+#[cfg(feature = "server")]
 use sqlx::{SqlitePool, sqlite::SqliteConnectOptions};
 #[cfg(feature = "server")]
 use std::str::FromStr;
@@ -162,4 +164,22 @@ pub async fn create_url(request: CreateUrlRequest) -> Result<String, CreateUrlEr
     }
 
     return Err(CreateUrlError::Internal);
+}
+
+#[cfg(feature = "server")]
+pub async fn redirect(
+    axum::extract::Path(hash): axum::extract::Path<String>,
+) -> axum::response::Response {
+    use axum::response::IntoResponse;
+
+    let found = sqlx::query_scalar::<_, String>("SELECT url FROM urls WHERE hash = ?")
+        .bind(&hash)
+        .fetch_optional(&*DB)
+        .await;
+
+    match found {
+        Ok(Some(url)) => axum::response::Redirect::temporary(&url).into_response(), // 307
+        Ok(None) => axum::http::StatusCode::NOT_FOUND.into_response(),
+        Err(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
 }

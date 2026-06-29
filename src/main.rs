@@ -12,7 +12,7 @@ enum Route {
     #[layout(Navbar)]
     #[route("/")]
     Home {},
-    #[route("/links")]
+    #[route("/app/links")]
     Links {},
 }
 
@@ -26,7 +26,8 @@ fn main() {
 
     #[cfg(feature = "server")]
     dioxus::serve(|| async move {
-        let router = dioxus::server::router(App);
+        use dioxus::server::axum::routing::get;
+        let router = dioxus::server::router(App).route("/{hash}", get(backend::redirect));
         Ok(router)
     });
 }

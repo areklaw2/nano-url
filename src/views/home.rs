@@ -69,7 +69,15 @@ pub fn Home() -> Element {
                                     id: "long-url",
                                     placeholder: "https://example.com",
                                     value: long_url,
-                                    oninput: move |e: FormEvent| long_url.set(e.value()),
+                                    oninput: move |e: FormEvent| {
+                                        let v = e.value();
+                                        if v.is_empty() {
+                                            long_url_error.set(None);
+                                        } else {
+                                            long_url_error.set(validate_url(&v).map(String::from));
+                                        }
+                                        long_url.set(v);
+                                    },
                                 }
                                 if let Some(err) = long_url_error.read().as_deref() {
                                     p { class: "field-error", "{err}" }
@@ -81,7 +89,16 @@ pub fn Home() -> Element {
                                     id: "alias",
                                     placeholder: "Alias",
                                     value: alias,
-                                    oninput: move |e: FormEvent| alias.set(Some(e.value())),
+                                    oninput: move |e: FormEvent| {
+                                        let v = e.value();
+                                        if v.is_empty() {
+                                            alias.set(None);
+                                            alias_error.set(None);
+                                        } else {
+                                            alias_error.set(validate_alias(&v).map(String::from));
+                                            alias.set(Some(v));
+                                        }
+                                    },
                                 }
                                 if let Some(err) = alias_error.read().as_deref() {
                                     p { class: "field-error", "{err}" }
