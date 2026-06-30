@@ -172,10 +172,14 @@ pub async fn redirect(
 ) -> axum::response::Response {
     use axum::response::IntoResponse;
 
-    let found = sqlx::query_scalar::<_, String>("SELECT url FROM urls WHERE hash = ?")
-        .bind(&hash)
-        .fetch_optional(&*DB)
-        .await;
+    let found = sqlx::query_scalar::<_, String>(
+        "UPDATE urls SET redirects = redirects + 1
+         WHERE hash = ? AND (expiration IS NULL OR expiration >= date('now'))
+         RETURNING url",
+    )
+    .bind(&hash)
+    .fetch_optional(&*DB)
+    .await;
 
     match found {
         Ok(Some(url)) => axum::response::Redirect::temporary(&url).into_response(), // 307
