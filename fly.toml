@@ -6,6 +6,10 @@
 app = 'nano-url'
 primary_region = 'ewr'
 
+[env]
+  BASE_URL = "https://nano-url.fly.dev"
+  DATABASE_URL = "sqlite:///usr/local/app/nano_url_db/nano_url.db"
+
 [build]
 
 [http_service]

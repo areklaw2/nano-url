@@ -14,8 +14,10 @@ use thiserror::Error;
 
 #[cfg(feature = "server")]
 static DB: Lazy<SqlitePool> = Lazy::new(|| async {
+    let db_url =
+        std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://nano_url.db".into());
     let pool = SqlitePool::connect_with(
-        SqliteConnectOptions::from_str("sqlite://nano_url.db")?.create_if_missing(true),
+        SqliteConnectOptions::from_str(&db_url)?.create_if_missing(true),
     )
     .await?;
 
