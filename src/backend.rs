@@ -187,3 +187,23 @@ pub async fn redirect(
         Err(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 }
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct Stats {
+    pub total_links: i64,
+    pub total_redirects: i64,
+}
+
+#[get("/api/stats")]
+pub async fn get_stats() -> Result<Stats, ServerFnError> {
+    let (total_links, total_redirects) =
+        sqlx::query_as::<_, (i64, i64)>("SELECT COUNT(*), COALESCE(SUM(redirects), 0) FROM urls")
+            .fetch_one(&*DB)
+            .await
+            .map_err(ServerFnError::new)?;
+
+    Ok(Stats {
+        total_links,
+        total_redirects,
+    })
+}

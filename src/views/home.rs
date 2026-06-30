@@ -1,5 +1,5 @@
 use crate::{
-    backend::{CreateUrlRequest, create_url},
+    backend::{CreateUrlRequest, create_url, get_stats},
     components::*,
 };
 use dioxus::prelude::*;
@@ -14,8 +14,7 @@ pub fn Home() -> Element {
     let mut long_url = use_signal(String::new);
     let mut alias = use_signal(|| None::<String>);
     let mut expiration = use_signal(|| None::<Date>);
-    let mut total_links_created = use_signal(|| 0u32);
-    let mut total_redirects = use_signal(|| 0u32);
+    let mut stats = use_resource(move || async move { get_stats().await });
 
     let mut long_url_error = use_signal(|| None::<String>);
     let mut alias_error = use_signal(|| None::<String>);
@@ -46,6 +45,12 @@ pub fn Home() -> Element {
             {
                 Ok(link) => {
                     nano_url.set(Some(link));
+                    stats.restart();
+                    long_url.set(String::new());
+                    alias.set(None);
+                    expiration.set(None);
+                    long_url_error.set(None);
+                    alias_error.set(None);
                     toast.success("Link created!".into(), ToastOptions::default());
                 }
                 Err(e) => toast.error(e.to_string(), ToastOptions::default()),
@@ -136,8 +141,18 @@ pub fn Home() -> Element {
                     CardTitle { "Stats" }
                 }
                 CardContent {
-                    p { class: "stats", "Total Links Created: {total_links_created}" }
-                    p { class: "stats", "Total Redirects: {total_redirects}" }
+                    {
+                        match &*stats.read() {
+                            Some(Ok(s)) => rsx! {
+                                p { class: "stats", "Total Links Created: {s.total_links}" }
+                                p { class: "stats", "Total Redirects: {s.total_redirects}" }
+                            },
+                            _ => rsx! {
+                                p { class: "stats", "Total Links Created: …" }
+                                p { class: "stats", "Total Redirects: …" }
+                            },
+                        }
+                    }
                 }
             }
         }
