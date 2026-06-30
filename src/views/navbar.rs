@@ -11,7 +11,7 @@ pub fn Navbar() -> Element {
             Link { to: Route::Home {},
                 h1 { " Nano Url" }
             }
-            Link { to: Route::Links {}, "Recent Links" }
+            Link { to: Route::Recent {}, "Recent Links" }
         }
 
         Outlet::<Route> {}

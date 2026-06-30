@@ -207,3 +207,29 @@ pub async fn get_stats() -> Result<Stats, ServerFnError> {
         total_redirects,
     })
 }
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RecentLink {
+    pub short: String,
+    pub url: String,
+    pub clicks: i64,
+}
+
+#[get("/api/recent")]
+pub async fn get_recent_links() -> Result<Vec<RecentLink>, ServerFnError> {
+    let rows = sqlx::query_as::<_, (String, String, i64)>(
+        "SELECT hash, url, redirects FROM urls ORDER BY created_at DESC, id DESC LIMIT 25",
+    )
+    .fetch_all(&*DB)
+    .await
+    .map_err(ServerFnError::new)?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(hash, url, clicks)| RecentLink {
+            short: format!("{}/{}", base_url().trim_end_matches('/'), hash),
+            url,
+            clicks,
+        })
+        .collect())
+}

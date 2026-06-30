@@ -1,7 +1,7 @@
 mod home;
-mod links;
 mod navbar;
+mod recent;
 
 pub use home::Home;
-pub use links::Links;
 pub use navbar::Navbar;
+pub use recent::Recent;

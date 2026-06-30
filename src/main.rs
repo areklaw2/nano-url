@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 use components::ToastProvider;
-use views::{Home, Links, Navbar};
+use views::{Home, Navbar, Recent};
 
 mod backend;
 mod components;
@@ -12,8 +12,8 @@ enum Route {
     #[layout(Navbar)]
     #[route("/")]
     Home {},
-    #[route("/app/links")]
-    Links {},
+    #[route("/app/recent")]
+    Recent {},
 }
 
 const MAIN_CSS: Asset = asset!("/assets/styling/main.css");
